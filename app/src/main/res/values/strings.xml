@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">MyWirelessADB</string>
+    <string name="acquire_root_failed">获取Root权限失败！</string>
+    <string name="adb_start_fail">开启adb服务失败！</string>
+    <string name="adb_start">开启adb</string>
+    <string name="adb_started">adb已开启！</string>
+    <string name="adb_stop_fail">停止adb服务失败！</string>
+    <string name="adb_stop">停止adb</string>
+    <string name="adb_stopped">adb已停止！</string>
+    <string name="net_error">网络已断开</string>
+    <string name="wifi_off">网络已断开！</string>
+    <string name="tv_title">无线调试助手</string>
+</resources>
