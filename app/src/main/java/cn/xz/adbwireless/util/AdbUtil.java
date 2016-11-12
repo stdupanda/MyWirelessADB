@@ -44,7 +44,7 @@ public class AdbUtil {
     /**
      * shell执行su判断是否有root权限
      *
-     * @return 是当前app否有root权限
+     * @return 当前app是否有root权限
      */
     public static boolean hasRootPermission() {
         Process process = null;

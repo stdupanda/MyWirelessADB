@@ -5,33 +5,30 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
-import android.net.wifi.WifiInfo;
-import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Message;
-import android.os.SystemClock;
 import android.support.v7.app.AlertDialog;
 import android.util.DisplayMetrics;
 import android.view.KeyEvent;
+import android.view.View;
 import android.view.WindowManager;
+import android.widget.CheckBox;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import java.net.Inet4Address;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.util.Enumeration;
-import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
 import cn.xz.adbwireless.util.AdbUtil;
+import cn.xz.adbwireless.util.IConst;
 import cn.xz.adbwireless.util.MLog;
+import cn.xz.adbwireless.util.MNetwork;
 import cn.xz.adbwireless.util.MToast;
 
 public class MainActivity extends Activity {
@@ -39,12 +36,8 @@ public class MainActivity extends Activity {
     private long mExitTime = 0;
     static final double NUM = 0.6;
 
-    private static final int MSG_DIALOG_SHOW = 1;
-    private static final int MSG_DIALOG_HIDE = 0;
-    private static final int MSG_ADB_START = 2;
-    private static final int MSG_ADB_STOP = 3;
-
-    AlertDialog alertDialog = null;
+    static final String msgStart = "正在启动adb...";
+    static final String msgStop = "正在停止adb...";
 
     @BindView(R.id.iv_wifi)
     ImageView ivWifi;
@@ -59,57 +52,23 @@ public class MainActivity extends Activity {
 
     private BroadcastReceiver myNetReceiver;
 
-    Handler handler = new Handler(new Handler.Callback() {
+    private ExecutorService executorService = Executors.newCachedThreadPool();
 
-        @Override
-        public boolean handleMessage(Message msg) {
-            switch (msg.what) {
-                case MSG_DIALOG_SHOW: {
-                    MLog.log("MSG_DIALOG_SHOW");
-                    //show dialog
-                    AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
-                    builder.setCancelable(false)
-                            .setMessage("正在启动adb...");
-                    alertDialog = builder.create();
-                    alertDialog.show();
-                    break;
-                }
-                case MSG_DIALOG_HIDE: {
-                    MLog.log("MSG_DIALOG_HIDE");
-                    //hide dialog
-                    if (null != alertDialog) {
-                        alertDialog.dismiss();
-                    }
-                    break;
-                }
-                case MSG_ADB_START: {
-                    startAdb();
-                    break;
-                }
-                case MSG_ADB_STOP: {
-                    stopAdb();
-                    break;
-                }
-                default: {
-                    //
-                }
-            }
-            return false;
-        }
-    });
+    SharedPreferences sp;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        sp = getSharedPreferences(IConst.SP_FILE_NAME, MODE_PRIVATE);
         ButterKnife.bind(this);
 
         regReceiver();
-        setScreenOnOff(true);
+        setScreenOnOff(sp.getBoolean(IConst.IF_SCREEN_ON, true));
         checkRoot();
 
 
-        if (!judgeNetwork()) {
+        if (!MNetwork.isWifi(MainActivity.this)) {
             tvState.setText(getString(R.string.net_error));
             tvSwitch.setEnabled(false);
             ivWifi.setImageResource(R.drawable.wifi_off);
@@ -126,7 +85,7 @@ public class MainActivity extends Activity {
             tvSwitch.setText(getString(R.string.adb_stop));
             String str = //getString(R.string.adb_started) +
 //                    System.getProperty("line.separator", "\\n") +
-                    "use adb connect " + getLocalIpAddress();
+                    "use adb connect " + MNetwork.getWiFiIp(MainActivity.this);
             tvState.setText(str);
             ivWifi.setImageResource(R.drawable.wifi_on);
         } else {
@@ -165,28 +124,76 @@ public class MainActivity extends Activity {
             MToast.Show(this, getString(R.string.acquire_root_failed));
             return;
         }
-        if (!judgeNetwork()) {
+        if (!MNetwork.isWifi(MainActivity.this)) {
             MToast.Show(this, getString(R.string.wifi_off));
             return;
         }
 
-        handler.sendEmptyMessage(MSG_DIALOG_SHOW);
-        SystemClock.sleep(1000);
-
         if (getString(R.string.adb_start).equals(tvSwitch.getText().toString())) {
             MLog.log("start it");
-            //startAdb();
-            handler.sendEmptyMessage(MSG_ADB_START);
+            new startAdbTask().executeOnExecutor(executorService, "null_param");
         } else if (getString(R.string.adb_stop).equals(tvSwitch.getText().toString())) {
             MLog.log("stop it");
-            //stopAdb();
-            handler.sendEmptyMessage(MSG_ADB_STOP);
+            new stopAdbTask().executeOnExecutor(executorService, "null_param");
         }
     }
 
     @OnClick(R.id.iv_setting)
     void setSetting() {
-        //
+        final View view = View.inflate(this, R.layout.view_config, null);
+        TextView btnYes = (TextView) view.findViewById(R.id.btn_yes);
+        TextView btnNo = (TextView) view.findViewById(R.id.btn_no);
+        final CheckBox cbIfScreenOn = (CheckBox) view.findViewById(R.id.cb_if_screen_on);
+
+        cbIfScreenOn.setChecked(sp.getBoolean(IConst.IF_SCREEN_ON, false));
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setView(view, 10, 0, 10, 0)
+                .setTitle("App设置")
+                .setCancelable(false);
+        final AlertDialog configDialog = builder.create();
+
+        btnYes.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                sp.edit()
+                        .putBoolean(IConst.IF_SCREEN_ON, cbIfScreenOn.isChecked())
+                        .apply();
+                MToast.Show(MainActivity.this, "app下次启动时生效");
+                configDialog.dismiss();
+            }
+        });
+
+        btnNo.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                configDialog.dismiss();
+            }
+        });
+
+        configDialog.show();
+    }
+
+    @OnClick(R.id.iv_about)
+    void setAbout() {
+        DisplayMetrics metrics = new DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getMetrics(metrics);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setView(R.layout.view_about)
+                .setTitle(getString(R.string.about_title))
+                .setCancelable(true)
+                .setPositiveButton(R.string.ok, null);
+        AlertDialog alertDialog = builder.create();
+        alertDialog.show();
+
+        WindowManager.LayoutParams layoutParams = alertDialog.getWindow().getAttributes();
+        if (layoutParams.height > (int) (metrics.heightPixels * 0.6)) {//窗口太大了，减小高度
+            layoutParams.height = (int) (metrics.heightPixels * 0.6);
+        }
+        layoutParams.width = (int) (metrics.widthPixels * 0.9);
+
+        alertDialog.getWindow().setAttributes(layoutParams);
     }
 
     /**
@@ -195,44 +202,23 @@ public class MainActivity extends Activity {
      * @return 有true 无false
      */
     private boolean checkRoot() {
-        if (!AdbUtil.hasRootPermission()) {
-            return false;
-        } else {
-            return true;
-        }
+        return AdbUtil.hasRootPermission();
     }
 
-    private void startAdb() {
+    private String startAdb() {
         if (AdbUtil.adbStart()) {
-            MToast.Show(this, getString(R.string.adb_started));
-            String str = getString(R.string.adb_started) +
-//                    System.getProperty("line.separator", "\\n") +
-                    " adb connect " + getLocalIpAddress();
-            tvState.setText(str);
-            tvSwitch.setText(getString(R.string.adb_stop));
-            ivWifi.setImageResource(R.drawable.wifi_on);
+            return "ok";
         } else {
-            MToast.Show(this, getString(R.string.adb_start_fail));
+            return "no";
         }
-
-        Message msg2 = Message.obtain();
-        msg2.what = MSG_DIALOG_HIDE;
-        handler.sendMessage(msg2);
     }
 
-    private void stopAdb() {
+    private String stopAdb() {
         if (AdbUtil.adbStop()) {
-            MToast.Show(this, getString(R.string.adb_stopped));
-            tvState.setText(getString(R.string.adb_stopped));
-            tvSwitch.setText(getString(R.string.adb_start));
-            ivWifi.setImageResource(R.drawable.wifi_off);
+            return "ok";
         } else {
-            MToast.Show(this, getString(R.string.adb_stop_fail));
+            return "no";
         }
-
-        Message msg2 = Message.obtain();
-        msg2.what = MSG_DIALOG_HIDE;
-        handler.sendMessage(msg2);
     }
 
     /**
@@ -271,7 +257,7 @@ public class MainActivity extends Activity {
                     MToast.Show(MainActivity.this, "网络已断开！请检查网络连接！");
                 }
             }
-            if (!judgeNetwork()) {
+            if (!MNetwork.isWifi(MainActivity.this)) {
                 tvState.setText(getString(R.string.net_error));
                 tvSwitch.setEnabled(false);
             } else {
@@ -301,97 +287,93 @@ public class MainActivity extends Activity {
         }
     }
 
-    /**
-     * 检测网络是否连接
-     *
-     * @return 是true否 false
-     */
-    private boolean checkNetworkState() {
-        boolean flag = false;
-        //得到网络连接信息
-        ConnectivityManager manager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-        //去进行判断网络是否连接
-        if (manager.getActiveNetworkInfo() != null) {
-            flag = manager.getActiveNetworkInfo().isAvailable();
-        }
-        return flag;
-    }
+    private class startAdbTask extends AsyncTask<String, Integer, String> {//params,progress,result
 
-    /**
-     * 获取当前网络类型，wifi、mobile、null
-     *
-     * @return
-     */
-    private String checkNetworkType() {
-        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
-        if (activeNetwork != null) { // connected to the internet
-            if (activeNetwork.getType() == ConnectivityManager.TYPE_WIFI) {
-                return "wifi";
-            } else if (activeNetwork.getType() == ConnectivityManager.TYPE_MOBILE) {
-                return "mobile";
+        AlertDialog alertDialog = null;
+        AlertDialog.Builder builder = null;
+
+        @Override
+        protected void onPreExecute() {
+            builder = new AlertDialog.Builder(MainActivity.this);
+            builder.setCancelable(false)
+                    .setMessage(msgStart);
+            alertDialog = builder.create();
+            alertDialog.show();
+            super.onPreExecute();
+        }
+
+        @Override
+        protected String doInBackground(String... params) {
+            return startAdb();
+        }
+
+        @Override
+        protected void onPostExecute(String s) {
+            if (null != alertDialog) {
+                alertDialog.dismiss();
+            }
+            if ("ok".equals(s)) {
+                MToast.Show(MainActivity.this, getString(R.string.adb_started));
+                String str = getString(R.string.adb_started) +
+//                    System.getProperty("line.separator", "\\n") +
+                        " adb connect " + "" + MNetwork.getWiFiIp(MainActivity.this);
+                tvState.setText("" + str);
+                tvState.refreshDrawableState();
+                tvSwitch.setText(getString(R.string.adb_stop));
+                ivWifi.setImageResource(R.drawable.wifi_on);
             } else {
-                return "other" + activeNetwork.getType();
+                MToast.Show(MainActivity.this, getString(R.string.adb_start_fail));
             }
+            super.onPostExecute(s);
         }
-        return null;
+
+        @Override
+        protected void onProgressUpdate(Integer... values) {
+            MLog.log(values[0]);
+            super.onProgressUpdate(values);
+        }
     }
 
-    /**
-     * 获取当前网络类型是否为wifi或者Ethernet
-     *
-     * @return 是true 否false
-     */
-    private boolean judgeNetwork() {
-        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
-        if (activeNetwork != null) {// connected to the internet
-            MLog.log("当前网络环境：" + activeNetwork.getType());
-            if (activeNetwork.getType() == ConnectivityManager.TYPE_WIFI
-                    || activeNetwork.getType() == ConnectivityManager.TYPE_ETHERNET) {
-                return true;
+    private class stopAdbTask extends AsyncTask<String, Integer, String> {//params,progress,result
+
+        AlertDialog alertDialog = null;
+        AlertDialog.Builder builder = null;
+
+        @Override
+        protected void onPreExecute() {
+            builder = new AlertDialog.Builder(MainActivity.this);
+            builder.setCancelable(false)
+                    .setMessage(msgStop);
+            alertDialog = builder.create();
+            alertDialog.show();
+            super.onPreExecute();
+        }
+
+        @Override
+        protected String doInBackground(String... params) {
+            return stopAdb();
+        }
+
+        @Override
+        protected void onPostExecute(String s) {
+            if (null != alertDialog) {
+                alertDialog.dismiss();
             }
-        }
-        return false;
-    }
-
-    /**
-     * @return 获取ip地址
-     */
-    public String getIpAddress() {
-        try {
-            for (Enumeration<NetworkInterface> en = NetworkInterface
-                    .getNetworkInterfaces(); en.hasMoreElements(); ) {
-                NetworkInterface intf = en.nextElement();
-                for (Enumeration<InetAddress> enumIpAddr = intf
-                        .getInetAddresses(); enumIpAddr.hasMoreElements(); ) {
-                    InetAddress inetAddress = enumIpAddr.nextElement();
-                    if (!inetAddress.isLoopbackAddress()
-                            && inetAddress instanceof Inet4Address) {
-
-                        return inetAddress.getHostAddress();
-                    }
-                }
+            if ("ok".equals(s)) {
+                MToast.Show(MainActivity.this, getString(R.string.adb_stopped));
+                tvState.setText(getString(R.string.adb_stopped));
+                tvSwitch.setText(getString(R.string.adb_start));
+                ivWifi.setImageResource(R.drawable.wifi_off);
+            } else {
+                MToast.Show(MainActivity.this, getString(R.string.adb_stop_fail));
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+            super.onPostExecute(s);
         }
-        return null;
+
+        @Override
+        protected void onProgressUpdate(Integer... values) {
+            MLog.log(values[0]);
+            super.onProgressUpdate(values);
+        }
     }
-
-    /**
-     * @return 获取局域网的ip地址形式（32位整型IP地址转成本地ip）
-     */
-    private String getLocalIpAddress() {
-        WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
-        WifiInfo wifiInfo = wifiManager.getConnectionInfo();
-        // 获取32位整型IP地址
-        int ipAddress = wifiInfo.getIpAddress();
-        // 返回整型地址转换成“*.*.*.*”地址
-        return String.format(Locale.ENGLISH, "%d.%d.%d.%d", (ipAddress & 0xff),
-                (ipAddress >> 8 & 0xff), (ipAddress >> 16 & 0xff),
-                (ipAddress >> 24 & 0xff));
-    }
-
-
 }

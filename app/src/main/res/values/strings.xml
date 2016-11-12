@@ -7,7 +7,16 @@
     <string name="adb_stop_fail">停止adb服务失败！</string>
     <string name="adb_stop">停止adb</string>
     <string name="adb_stopped">adb已停止！</string>
-    <string name="net_error">网络已断开</string>
-    <string name="wifi_off">网络已断开！</string>
+    <string name="net_error">wifi已断开</string>
+    <string name="wifi_off">wifi已断开！</string>
     <string name="tv_title">无线调试助手</string>
+    <string name="about">wifi调试助手\n感谢：\n
+    com.jakewharton:butterknife:8.4.0\n基于
+        siir.es.adbWireless\n<a href="https://github.com/MrSiir/">https://github.com/MrSiir/</a>
+    </string>
+    <string name="ok">确定</string>
+    <string name="about_title">关于</string>
+    <string name="confirm">确认</string>
+    <string name="cancel">取消</string>
+    <string name="adb_on_screen_on">开启adb时屏幕常亮：</string>
 </resources>

@@ -8,4 +8,8 @@
         <item name="colorAccent">@color/colorAccent</item>
     </style>
 
+    <style name="tv_text_size2">
+        <item name="android:textSize">20sp</item>
+        <item name="android:layout_marginLeft">6dp</item>
+    </style>
 </resources>

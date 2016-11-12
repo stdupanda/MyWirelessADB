@@ -36,9 +36,9 @@
 
         <ImageView
             android:id="@+id/iv_about"
-            android:layout_marginLeft="5dp"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginLeft="5dp"
             android:layout_weight="0"
             android:background="@drawable/selector_about"
             android:clickable="true" />
@@ -61,14 +61,14 @@
                 android:layout_width="130dp"
                 android:layout_height="130dp"
                 android:src="@drawable/wifi_on" />
-
-            <TextView
-                android:id="@+id/tv_state"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:text="open" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/tv_state"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="@string/adb_start" />
     </LinearLayout>
 
     <LinearLayout
