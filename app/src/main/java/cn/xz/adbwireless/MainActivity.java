@@ -83,7 +83,7 @@ public class MainActivity extends Activity {
 
         if (AdbUtil.adbIfRunning()) {
             tvSwitch.setText(getString(R.string.adb_stop));
-            String str = //getString(R.string.adb_started) +
+            String str = getString(R.string.adb_started) +
 //                    System.getProperty("line.separator", "\\n") +
                     "use adb connect " + MNetwork.getWiFiIp(MainActivity.this);
             tvState.setText(str);
@@ -313,7 +313,7 @@ public class MainActivity extends Activity {
                 alertDialog.dismiss();
             }
             if ("ok".equals(s)) {
-                MToast.Show(MainActivity.this, getString(R.string.adb_started));
+                //MToast.Show(MainActivity.this, getString(R.string.adb_started));
                 String str = getString(R.string.adb_started) +
 //                    System.getProperty("line.separator", "\\n") +
                         " adb connect " + "" + MNetwork.getWiFiIp(MainActivity.this);
@@ -360,7 +360,7 @@ public class MainActivity extends Activity {
                 alertDialog.dismiss();
             }
             if ("ok".equals(s)) {
-                MToast.Show(MainActivity.this, getString(R.string.adb_stopped));
+                //MToast.Show(MainActivity.this, getString(R.string.adb_stopped));
                 tvState.setText(getString(R.string.adb_stopped));
                 tvSwitch.setText(getString(R.string.adb_start));
                 ivWifi.setImageResource(R.drawable.wifi_off);

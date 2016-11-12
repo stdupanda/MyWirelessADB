@@ -1,5 +1,6 @@
 <resources>
     <string name="app_name">MyWirelessADB</string>
+    <string name="app_name2">WiFi调试</string>
     <string name="acquire_root_failed">获取Root权限失败！</string>
     <string name="adb_start_fail">开启adb服务失败！</string>
     <string name="adb_start">开启adb</string>
