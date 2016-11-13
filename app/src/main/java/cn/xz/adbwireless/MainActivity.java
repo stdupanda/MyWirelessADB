@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.graphics.Paint;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.AsyncTask;
@@ -67,12 +68,18 @@ public class MainActivity extends Activity {
         setScreenOnOff(sp.getBoolean(IConst.IF_SCREEN_ON, true));
         checkRoot();
 
-
-        if (!MNetwork.isWifi(MainActivity.this)) {
+        if (!MNetwork.isWifi(this)) {
             tvState.setText(getString(R.string.net_error));
+            tvState.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    startActivity(new Intent("android.settings.WIFI_SETTINGS"));
+                }
+            });
             tvSwitch.setEnabled(false);
             ivWifi.setImageResource(R.drawable.wifi_off);
         } else {
+            tvState.setOnClickListener(null);
             tvSwitch.setEnabled(true);
             ivWifi.setImageResource(R.drawable.wifi_on);
         }
@@ -259,8 +266,20 @@ public class MainActivity extends Activity {
             }
             if (!MNetwork.isWifi(MainActivity.this)) {
                 tvState.setText(getString(R.string.net_error));
+                tvState.getPaint().setFlags(Paint.UNDERLINE_TEXT_FLAG);
+                tvState.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        startActivity(new Intent("android.settings.WIFI_SETTINGS"));
+                    }
+                });
                 tvSwitch.setEnabled(false);
             } else {
+                if (getString(R.string.net_error).equals(tvState.getText())) {
+                    tvState.setText(getString(R.string.net_ok, ""));
+                    tvState.getPaint().setFlags(0);
+                }
+                tvState.setOnClickListener(null);
                 tvSwitch.setEnabled(true);
             }
         }
