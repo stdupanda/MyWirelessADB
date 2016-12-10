@@ -116,7 +116,7 @@ public class MainActivity extends Activity {
                 MToast.Show(this, "再按一次退出程序！");
                 mExitTime = System.currentTimeMillis();
             } else {
-                stopAdb();
+                //stopAdb();
                 finish();
                 System.exit(0);
             }
